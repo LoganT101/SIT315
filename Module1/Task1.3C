@@ -1,0 +1,74 @@
+// initialise pins
+int LDRPin = A0;      
+int tempPin = A1;
+int LEDPin = 11; 
+int LEDPin2 = 4;
+
+// initialise sensor reading
+int LDRValue = 0;
+float tempValue = 0;
+
+// setup
+void setup()
+{
+  pinMode(LDRPin, INPUT);
+  pinMode(tempPin, INPUT);
+  pinMode(LEDPin, OUTPUT);
+  pinMode(LEDPin2, OUTPUT);
+  
+  Serial.begin(9600);
+  
+  // setup timer interrupt
+  startTimer();
+}
+
+void loop()
+{
+}
+
+// setup timer
+void startTimer() {
+  noInterrupts();
+  // configure timer
+  TCCR1A = 0; // clear control registers
+  TCCR1B = 0;
+  TCNT1 = 0; // initialise counter
+
+  // set compare match register for 1Hz
+  OCR1A = 15624; // (16*10^6) / (1024*1) - 1 (must be <65536)
+
+  // enable CTC
+  TCCR1B |= (1 << WGM12);
+
+  // set CS10 and CS12 bits for 1024 prescaler
+  TCCR1B |= (1 << CS12) | (1 << CS10);
+
+  // enable timer compare interrupt
+  TIMSK1 |= (1 << OCIE1A);
+  interrupts();
+}
+
+// interrupt
+ISR(TIMER1_COMPA_vect) {
+  // read light sensor
+  LDRValue = analogRead(LDRPin);
+ 
+   // read temp sensor
+  int sensorValue = analogRead(tempPin);
+  float voltage = sensorValue * (5.0 / 1023.0); // convert to voltage
+  tempValue = (voltage - 0.5) * 100.0; // convert to Celsius
+  
+  // print light sensor value
+  Serial.println("Light: " + String(LDRValue));
+ 
+  // print temp sensor value
+  Serial.println("Temperature: " + String(tempValue) + "C");
+  
+  // map light sensor value to LED
+  analogWrite(LEDPin, map(LDRValue, 0, 1023, 0, 255));
+  
+  // map temp sensor value to LED2
+  int led2Brightness = map(tempValue, 0, 40, 0, 255); // assume temperature range is 0 to 40°C
+  led2Brightness = constrain(led2Brightness, 0, 255); // constrain value to valid range
+  analogWrite(LEDPin2, led2Brightness);
+}
